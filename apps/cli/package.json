@@ -16,13 +16,13 @@
     "llm"
   ],
   "author": "Imdeadpool",
-  "homepage": "https://github.com/recodeee/colony",
+  "homepage": "https://github.com/opencue/colony",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/recodeee/colony.git"
+    "url": "git+https://github.com/opencue/colony.git"
   },
   "bugs": {
-    "url": "https://github.com/recodeee/colony/issues"
+    "url": "https://github.com/opencue/colony/issues"
   },
   "engines": {
     "node": ">=20.0.0"
