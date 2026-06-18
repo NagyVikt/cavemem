@@ -1,5 +1,13 @@
 # @colony/spec
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [f6282ba]
+  - @colony/storage@0.9.0
+  - @colony/core@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

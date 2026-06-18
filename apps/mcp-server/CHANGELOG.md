@@ -1,5 +1,29 @@
 # @colony/mcp-server
 
+## 0.9.0
+
+### Minor Changes
+
+- f6282ba: feat(coordination): goal-on-lane + lanes view
+
+  File claims now carry an optional `goal` and `check` (gx /goal style), persisted on the
+  claim row and surfaced wherever the claim's owner is shown — `active_claims`,
+  `attention_inbox` recent claims, `bridge_status`, `hivemind_context` local claims, and a
+  contended claim's `contention_detail.owner_goal`/`owner_check`. A new `colony lane list`
+  CLI (backed by a reusable `buildLanesSummary` core builder) summarizes one lane per branch
+  with its agent, stated goal, held files, and activity line. A goal-less re-claim (e.g. the
+  hook auto-claim path) preserves an already-set goal via a COALESCE upsert.
+
+### Patch Changes
+
+- a3c4625: mcp: live registration telemetry now reports a `schema_tokens` proxy + `total_tokens` in `savings_report`. Previously `registration_cost` counted name+description only, under-reporting the true per-session injection cost; the schema portion (param keys + describe strings) is now included so live receipts track closer to the byte-exact budget enforced by `tool-budget.test.ts`.
+- Updated dependencies [f6282ba]
+  - @colony/core@0.9.0
+  - @colony/foraging@0.9.0
+  - @colony/queen@0.9.0
+  - @colony/spec@0.9.0
+  - @colony/hooks@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
