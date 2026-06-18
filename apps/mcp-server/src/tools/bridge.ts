@@ -93,6 +93,8 @@ export interface BridgeStatus {
     by_session_id: string;
     claimed_at: number;
     yours: boolean;
+    goal: string | null;
+    check: string | null;
   }>;
   claimed_files: Array<{
     task_id: number;
@@ -100,6 +102,8 @@ export interface BridgeStatus {
     by_session_id: string;
     claimed_at: number;
     yours: boolean;
+    goal: string | null;
+    check: string | null;
   }>;
   latest_working_note: {
     id: number;
@@ -365,6 +369,8 @@ function taskClaimSummary(
       by_session_id: claim.session_id,
       claimed_at: claim.claimed_at,
       yours: claim.session_id === sessionId,
+      goal: claim.goal,
+      check: claim.goal_check,
     })),
   };
 }

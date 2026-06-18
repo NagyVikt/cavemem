@@ -49,6 +49,12 @@ export {
   type HivemindSnapshot,
 } from './hivemind.js';
 export {
+  buildLanesSummary,
+  type BuildLanesOptions,
+  type LaneSummary,
+  type LanesSummary,
+} from './lanes.js';
+export {
   readWorktreeContentionReport,
   resolveManagedRepoRoot,
   type ManagedWorktreeInspection,

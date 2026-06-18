@@ -1119,6 +1119,8 @@ Claim a file before editing so other agents see ownership and overlap warnings. 
 
 Claims are warnings, not locks. They never block writes. They arm the conflict preface for the next turn.
 
+Optional `goal` and `check` record **why** the lane is locked — the outcome you are pursuing (gx /goal style) and a runnable criterion that proves it. They are persisted on the claim row (not just the observation) and surface wherever the claim's owner does: `attention_inbox` recent claims, `bridge_status`, `hivemind_context` local claims, and a contended claim's `contention_detail.owner_goal`/`owner_check`. The same per-lane view is on the CLI as `colony lane list`. A re-claim that omits `goal` preserves a goal already set, so the hook auto-claim path never erases stated intent.
+
 Coordination gates follow `settings.coordinationMode` (default `open`):
 
 - **open (default)** — contended claims succeed. When another live session holds the file, the response carries `contention: true`, `claim_status` (`blocked_active_owner` | `takeover_recommended`), a `warning`, and `contention_detail`; the claim observation is recorded but table ownership stays with the live owner — coordinate via `task_message` before editing. Roles are advisory: scouts can claim.
@@ -1136,7 +1138,9 @@ Existing claims are age-classified before they are treated as ownership. Fresh c
     "session_id": "sess_abc",
     "agent": "codex",
     "file_path": "packages/storage/src/storage.ts",
-    "note": "extending searchFts with a filter arg"
+    "note": "extending searchFts with a filter arg",
+    "goal": "searchFts accepts a language filter; existing callers unaffected",
+    "check": "pnpm --filter @colony/storage test"
   }
 }
 ```

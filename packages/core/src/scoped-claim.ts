@@ -28,6 +28,10 @@ export interface GuardedClaimResult {
   owner_agent?: string | undefined;
   owner_active?: boolean;
   owner_dirty?: boolean;
+  /** The blocking owner's stated goal — why the lane is held, not just who holds it. */
+  owner_goal?: string | undefined;
+  /** The blocking owner's runnable check, when stated. */
+  owner_check?: string | undefined;
   recommendation?: string;
   /**
    * Set when the task's branch is one of the repo-wide protected base
@@ -51,6 +55,8 @@ export function guardedClaimFile(
     file_path: string;
     session_id: string;
     agent?: string;
+    goal?: string;
+    check?: string;
     worktreeContention?: WorktreeContentionReport | null;
     dryRun?: boolean;
   },
@@ -133,6 +139,8 @@ export function guardedClaimFile(
       owner_agent: blockingActive.owner.agent,
       owner_active: true,
       owner_dirty: blockingActive.owner.dirty,
+      owner_goal: blockingActive.claim.goal ?? undefined,
+      owner_check: blockingActive.claim.goal_check ?? undefined,
       recommendation: `request handoff or explicit takeover from active owner ${blockingActive.claim.session_id} before claiming ${filePath}`,
     });
   }
@@ -150,6 +158,8 @@ export function guardedClaimFile(
       owner_agent: dirtyOwner.owner.agent,
       owner_active: dirtyOwner.owner.active,
       owner_dirty: true,
+      owner_goal: dirtyOwner.claim.goal ?? undefined,
+      owner_check: dirtyOwner.claim.goal_check ?? undefined,
       recommendation: `dirty worktree still has ${filePath}; require handoff or rescue from ${dirtyOwner.claim.session_id} before claiming`,
     });
   }
@@ -228,13 +238,22 @@ export function guardedClaimFile(
 
 function claimFileUnlessDryRun(
   store: MemoryStore,
-  args: { task_id: number; file_path: string; session_id: string; dryRun?: boolean },
+  args: {
+    task_id: number;
+    file_path: string;
+    session_id: string;
+    goal?: string;
+    check?: string;
+    dryRun?: boolean;
+  },
 ): void {
   if (args.dryRun === true) return;
   store.storage.claimFile({
     task_id: args.task_id,
     file_path: args.file_path,
     session_id: args.session_id,
+    ...(args.goal !== undefined ? { goal: args.goal } : {}),
+    ...(args.check !== undefined ? { check: args.check } : {}),
   });
 }
 

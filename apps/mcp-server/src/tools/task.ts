@@ -374,96 +374,111 @@ export function register(server: McpServer, ctx: ToolContext): void {
       agent: z.string().min(1).optional(),
       file_path: z.string().min(1),
       note: z.string().optional(),
+      goal: z
+        .string()
+        .optional()
+        .describe('Why this lane is locked — the outcome you are pursuing (gx /goal style).'),
+      check: z
+        .string()
+        .optional()
+        .describe('Runnable criterion that proves the goal (a command, test, or metric).'),
     },
-    wrapHandler('task_claim_file', async ({ task_id, session_id, agent, file_path, note }) => {
-      try {
-        enforceScoutNoClaim(store, {
-          session_id,
-          ...(agent !== undefined ? { agent } : {}),
-        });
-      } catch (err) {
-        if (err instanceof ClaimsHandlerError) {
-          return mcpErrorResponse(err.code, err.message);
+    wrapHandler(
+      'task_claim_file',
+      async ({ task_id, session_id, agent, file_path, note, goal, check }) => {
+        try {
+          enforceScoutNoClaim(store, {
+            session_id,
+            ...(agent !== undefined ? { agent } : {}),
+          });
+        } catch (err) {
+          if (err instanceof ClaimsHandlerError) {
+            return mcpErrorResponse(err.code, err.message);
+          }
+          throw err;
         }
-        throw err;
-      }
-      const normalizedFilePath = store.storage.normalizeTaskFilePath(task_id, file_path);
-      if (normalizedFilePath === null) {
-        const reason = store.storage.classifyTaskFilePathRejection(task_id, file_path);
-        const task = store.storage.getTask(task_id);
-        return mcpErrorResponse(
-          'INVALID_CLAIM_PATH',
-          claimPathRejectionMessage(reason, file_path, { repo_root: task?.repo_root }),
-        );
-      }
-      const previous = store.storage.getClaim(task_id, normalizedFilePath);
-      const guarded = guardedClaimFile(store, {
-        task_id,
-        session_id,
-        file_path: normalizedFilePath,
-      });
-      const contended =
-        guarded.status === 'takeover_recommended' || guarded.status === 'blocked_active_owner';
-      if (contended && settings.coordinationMode === 'guarded') {
-        if (guarded.status === 'takeover_recommended') {
+        const normalizedFilePath = store.storage.normalizeTaskFilePath(task_id, file_path);
+        if (normalizedFilePath === null) {
+          const reason = store.storage.classifyTaskFilePathRejection(task_id, file_path);
+          const task = store.storage.getTask(task_id);
           return mcpErrorResponse(
-            'CLAIM_TAKEOVER_RECOMMENDED',
-            guarded.recommendation ?? 'release or take over inactive claim before claiming',
+            'INVALID_CLAIM_PATH',
+            claimPathRejectionMessage(reason, file_path, { repo_root: task?.repo_root }),
+          );
+        }
+        const previous = store.storage.getClaim(task_id, normalizedFilePath);
+        const guarded = guardedClaimFile(store, {
+          task_id,
+          session_id,
+          file_path: normalizedFilePath,
+          ...(goal !== undefined ? { goal } : {}),
+          ...(check !== undefined ? { check } : {}),
+        });
+        const contended =
+          guarded.status === 'takeover_recommended' || guarded.status === 'blocked_active_owner';
+        if (contended && settings.coordinationMode === 'guarded') {
+          if (guarded.status === 'takeover_recommended') {
+            return mcpErrorResponse(
+              'CLAIM_TAKEOVER_RECOMMENDED',
+              guarded.recommendation ?? 'release or take over inactive claim before claiming',
+              { ...guarded },
+            );
+          }
+          return mcpErrorResponse(
+            'CLAIM_HELD_BY_ACTIVE_OWNER',
+            guarded.recommendation ?? 'request handoff or explicit takeover before claiming',
             { ...guarded },
           );
         }
-        return mcpErrorResponse(
-          'CLAIM_HELD_BY_ACTIVE_OWNER',
-          guarded.recommendation ?? 'request handoff or explicit takeover before claiming',
-          { ...guarded },
-        );
-      }
-      if (guarded.status === 'task_not_found') {
-        return mcpErrorResponse('TASK_NOT_FOUND', `task ${task_id} not found`);
-      }
-      if (guarded.status === 'protected_branch_rejected') {
-        return mcpErrorResponse(
-          'PROTECTED_BRANCH_CLAIM_REJECTED',
-          guarded.recommendation ??
-            `task ${task_id} is on protected branch ${guarded.protected_branch?.branch}; start a sandbox worktree first`,
-          { ...guarded },
-        );
-      }
-      new TaskThread(store, task_id).join(session_id, agentForTaskClaim(session_id));
-      const id = store.addObservation({
-        session_id,
-        kind: 'claim',
-        content: note ? `claim ${normalizedFilePath} — ${note}` : `claim ${normalizedFilePath}`,
-        task_id,
-        metadata: {
+        if (guarded.status === 'task_not_found') {
+          return mcpErrorResponse('TASK_NOT_FOUND', `task ${task_id} not found`);
+        }
+        if (guarded.status === 'protected_branch_rejected') {
+          return mcpErrorResponse(
+            'PROTECTED_BRANCH_CLAIM_REJECTED',
+            guarded.recommendation ??
+              `task ${task_id} is on protected branch ${guarded.protected_branch?.branch}; start a sandbox worktree first`,
+            { ...guarded },
+          );
+        }
+        new TaskThread(store, task_id).join(session_id, agentForTaskClaim(session_id));
+        const id = store.addObservation({
+          session_id,
           kind: 'claim',
+          content: note ? `claim ${normalizedFilePath} — ${note}` : `claim ${normalizedFilePath}`,
+          task_id,
+          metadata: {
+            kind: 'claim',
+            file_path: normalizedFilePath,
+            guarded_claim_status: guarded.status,
+            ...(goal !== undefined ? { goal } : {}),
+            ...(check !== undefined ? { goal_check: check } : {}),
+          },
+        });
+        store.storage.touchTask(task_id);
+        const previousClaim = previous
+          ? compactPreviousClaim(previous, session_id, settings.claimStaleMinutes)
+          : null;
+        // Open mode lets contended claims through: the claim succeeds, but the
+        // response carries the contention loudly so the agent coordinates
+        // instead of silently clobbering a live owner.
+        return jsonReply({
+          observation_id: id,
           file_path: normalizedFilePath,
-          guarded_claim_status: guarded.status,
-        },
-      });
-      store.storage.touchTask(task_id);
-      const previousClaim = previous
-        ? compactPreviousClaim(previous, session_id, settings.claimStaleMinutes)
-        : null;
-      // Open mode lets contended claims through: the claim succeeds, but the
-      // response carries the contention loudly so the agent coordinates
-      // instead of silently clobbering a live owner.
-      return jsonReply({
-        observation_id: id,
-        file_path: normalizedFilePath,
-        claim_status: guarded.status,
-        claim_task_id: guarded.claim_task_id ?? task_id,
-        contention: contended,
-        contention_detail: contended ? { ...guarded } : null,
-        warning: contended
-          ? (guarded.recommendation ??
-            'another live session holds this file; coordinate via task_message before editing')
-          : null,
-        live_file_contentions: [],
-        overlap: previousClaim?.overlap ?? 'none',
-        previous_claim: previousClaim,
-      });
-    }),
+          claim_status: guarded.status,
+          claim_task_id: guarded.claim_task_id ?? task_id,
+          contention: contended,
+          contention_detail: contended ? { ...guarded } : null,
+          warning: contended
+            ? (guarded.recommendation ??
+              'another live session holds this file; coordinate via task_message before editing')
+            : null,
+          live_file_contentions: [],
+          overlap: previousClaim?.overlap ?? 'none',
+          previous_claim: previousClaim,
+        });
+      },
+    ),
   );
 
   server.tool(

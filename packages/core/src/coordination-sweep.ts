@@ -1765,6 +1765,8 @@ function fallbackClaimRows(
     state: 'active',
     expires_at: null,
     handoff_observation_id: null,
+    goal: null,
+    goal_check: null,
   }));
 }
 

@@ -136,6 +136,8 @@ export interface InboxRecentClaim {
   age_minutes: number;
   age_class: ClaimAgeClass;
   ownership_strength: ClaimOwnershipStrength;
+  goal: string | null;
+  check: string | null;
 }
 
 export interface InboxFileHeat {
@@ -1096,6 +1098,8 @@ function compactClaim(
     age_minutes: classification.age_minutes,
     age_class: classification.age_class,
     ownership_strength: classification.ownership_strength,
+    goal: row.goal,
+    check: row.goal_check,
   };
 }
 

@@ -766,11 +766,18 @@ describe('TaskThread', () => {
 
     const row = store.storage.getObservation(relayId);
     const meta = JSON.parse(row?.metadata ?? '{}') as {
-      resumable_state: { active_claims: Array<{ file_path: string; held_by: string }> };
+      resumable_state: {
+        active_claims: Array<{
+          file_path: string;
+          held_by: string;
+          goal: string | null;
+          check: string | null;
+        }>;
+      };
       worktree_recipe: { inherit_claims: string[] };
     };
     expect(meta.resumable_state.active_claims).toEqual([
-      { file_path: 'src/fresh.ts', held_by: 'claude' },
+      { file_path: 'src/fresh.ts', held_by: 'claude', goal: null, check: null },
     ]);
     expect(meta.worktree_recipe.inherit_claims).toEqual(['src/fresh.ts']);
 

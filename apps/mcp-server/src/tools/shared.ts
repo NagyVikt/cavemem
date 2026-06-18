@@ -139,6 +139,8 @@ export interface HivemindLocalClaim {
   age_class: ClaimAgeClass;
   ownership_strength: ClaimOwnershipStrength;
   yours: boolean;
+  goal: string | null;
+  check: string | null;
 }
 
 export interface HivemindLocalPheromoneTrail {
@@ -617,6 +619,8 @@ function localClaims(
       age_class: age.age_class,
       ownership_strength: age.ownership_strength,
       yours: claim.session_id === input.sessionId,
+      goal: claim.goal,
+      check: claim.goal_check,
     })),
     truncated: sorted.length > input.limit,
   };

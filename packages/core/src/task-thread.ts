@@ -386,7 +386,12 @@ export interface RelayMetadata {
    */
   resumable_state: {
     last_files_edited: Array<{ file_path: string; ts: number; session_id: string }>;
-    active_claims: Array<{ file_path: string; held_by: string }>;
+    active_claims: Array<{
+      file_path: string;
+      held_by: string;
+      goal: string | null;
+      check: string | null;
+    }>;
     /** Last handoff summary or relay one_line, whichever is more recent. */
     last_handoff_summary: string | null;
     recent_decisions: Array<{ id: number; content: string; ts: number }>;
@@ -621,6 +626,8 @@ export class TaskThread {
     session_id: string;
     file_path: string;
     note?: string;
+    goal?: string;
+    check?: string;
     metadata?: Record<string, unknown>;
   }): number {
     const filePath = this.store.storage.normalizeTaskFilePath(this.task_id, p.file_path);
@@ -637,13 +644,21 @@ export class TaskThread {
         task_id: this.task_id,
         file_path: filePath,
         session_id: p.session_id,
+        ...(p.goal !== undefined ? { goal: p.goal } : {}),
+        ...(p.check !== undefined ? { check: p.check } : {}),
       });
       return this.store.addObservation({
         session_id: p.session_id,
         kind: 'claim',
         content: p.note ? `claim ${filePath} — ${p.note}` : `claim ${filePath}`,
         task_id: this.task_id,
-        metadata: { kind: 'claim', file_path: filePath, ...(p.metadata ?? {}) },
+        metadata: {
+          kind: 'claim',
+          file_path: filePath,
+          ...(p.goal !== undefined ? { goal: p.goal } : {}),
+          ...(p.check !== undefined ? { goal_check: p.check } : {}),
+          ...(p.metadata ?? {}),
+        },
       });
     });
   }
@@ -2086,6 +2101,8 @@ export class TaskThread {
       .map((c) => ({
         file_path: c.file_path,
         held_by: c.session_id,
+        goal: c.goal,
+        check: c.goal_check,
       }));
 
     // Most recent prior baton-pass — handoff or relay, whichever ran last —

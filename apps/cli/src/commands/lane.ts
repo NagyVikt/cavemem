@@ -2,7 +2,7 @@ import { userInfo } from 'node:os';
 import { resolve } from 'node:path';
 import { loadSettings } from '@colony/config';
 import type { LiveFileContentionGroup, MemoryStore } from '@colony/core';
-import { inferIdeFromSessionId, listLiveFileContentions } from '@colony/core';
+import { buildLanesSummary, inferIdeFromSessionId, listLiveFileContentions } from '@colony/core';
 import type { LaneRunState } from '@colony/storage';
 import { type Command, InvalidArgumentError } from 'commander';
 import kleur from 'kleur';
@@ -118,6 +118,47 @@ export function registerLaneCommand(program: Command): void {
             );
           }
           process.stdout.write(formatTakeoverHints(group));
+        }
+      });
+    });
+
+  group
+    .command('list')
+    .description('List active lanes: who is on what branch, why (their goal), and what they hold')
+    .option('--repo-root <path>', 'limit to a specific repo root (defaults to process.cwd())')
+    .option('--include-stale', 'include lanes whose heartbeat has gone stale')
+    .option('--json', 'emit JSON')
+    .action(async (opts: { repoRoot?: string; includeStale?: boolean; json?: boolean }) => {
+      const repoRoot = resolve(opts.repoRoot ?? process.cwd());
+      const settings = loadSettings();
+      await withStore(settings, (store) => {
+        const summary = buildLanesSummary(store, {
+          repo_root: repoRoot,
+          ...(opts.includeStale ? { includeStale: true } : {}),
+        });
+        if (opts.json) {
+          process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+          return;
+        }
+        if (summary.lanes.length === 0) {
+          process.stdout.write(`${kleur.dim('no active lanes in scope')}\n`);
+          return;
+        }
+        process.stdout.write(`${kleur.bold(`${summary.lane_count} lane(s)`)}\n`);
+        for (const lane of summary.lanes) {
+          process.stdout.write(
+            `\n  ${kleur.bold(lane.branch)}  ${kleur.dim(`(${lane.agent}, ${lane.activity})`)}\n`,
+          );
+          if (lane.goal) {
+            const check = lane.check ? kleur.dim(`  [check: ${lane.check}]`) : '';
+            process.stdout.write(`    goal: ${lane.goal}${check}\n`);
+          }
+          if (lane.now_line) {
+            process.stdout.write(`    ${kleur.dim(lane.now_line)}\n`);
+          }
+          if (lane.held_files.length > 0) {
+            process.stdout.write(`    holds: ${lane.held_files.join(', ')}\n`);
+          }
         }
       });
     });
