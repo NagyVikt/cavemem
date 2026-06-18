@@ -285,11 +285,21 @@ describe('MCP server', () => {
         profile: string;
         tool_count: number;
         name_description_tokens: number;
+        schema_tokens: number;
+        total_tokens: number;
       } | null;
     };
     expect(withRegistration.registration_cost).toMatchObject({ profile: 'full' });
     expect(withRegistration.registration_cost?.tool_count).toBeGreaterThan(70);
     expect(withRegistration.registration_cost?.name_description_tokens).toBeGreaterThan(1000);
+    // > 200, not > 0: 70+ tools' param keys alone clear this, so a silent
+    // regression in the `.describe()` path (schema_tokens collapsing toward
+    // key-only counts) still trips the floor.
+    expect(withRegistration.registration_cost?.schema_tokens).toBeGreaterThan(200);
+    expect(withRegistration.registration_cost?.total_tokens).toBe(
+      (withRegistration.registration_cost?.name_description_tokens ?? 0) +
+        (withRegistration.registration_cost?.schema_tokens ?? 0),
+    );
     expect(payload.live.cost_basis.configured).toBe(true);
     expect(payload.live.totals.total_cost_usd).toBeCloseTo(0.005, 12);
     expect(payload.live.totals.avg_cost_usd).toBeCloseTo(0.005, 12);

@@ -59,7 +59,7 @@ export function resolveToolProfile(
 export function gateToolRegistration(
   server: McpServer,
   allow: (name: string) => boolean,
-  onRegister?: (name: string, description: string) => void,
+  onRegister?: (name: string, description: string, schema?: unknown) => void,
 ): McpServer {
   return new Proxy(server, {
     get(target, prop, _receiver) {
@@ -68,7 +68,16 @@ export function gateToolRegistration(
           const name = args[0];
           if (typeof name === 'string' && !allow(name)) return undefined;
           if (typeof name === 'string' && onRegister) {
-            onRegister(name, typeof args[1] === 'string' ? args[1] : '');
+            // server.tool(name, description?, paramsShape?, annotations?, handler):
+            // the param shape sits after the description when present, else right
+            // after name. An annotations object can also land at args[2]; it carries
+            // no `.describe()` keys, so countSchemaTokens scores it 0 — harmless.
+            const hasDescription = typeof args[1] === 'string';
+            onRegister(
+              name,
+              hasDescription ? (args[1] as string) : '',
+              hasDescription ? args[2] : args[1],
+            );
           }
           return (target.tool as (...a: unknown[]) => unknown).apply(target, args);
         };
@@ -82,15 +91,22 @@ export function gateToolRegistration(
 }
 
 /**
- * Registration-cost telemetry captured while tools register. Token figure
- * covers name + description only — input schemas are zod shapes here and only
- * become countable JSON schema at listTools time; the schema-inclusive budget
- * lives in apps/mcp-server/test/tool-budget.test.ts. Tools registered via the
- * SDK's schema-first overload (no description string) count name-only — a
+ * Registration-cost telemetry captured while tools register.
+ * `name_description_tokens` covers name + description. `schema_tokens` is a
+ * robust proxy for the input-schema injection cost — param keys plus their
+ * public `.describe()` strings, the agent-facing bulk of the rendered JSON
+ * schema. It is intentionally NOT a full zod→JSON-schema conversion: that is
+ * version-coupled (zod-to-json-schema is pinned to a specific zod build and
+ * silently emits an empty schema across instances) and belongs to the
+ * authoritative byte-exact budget gate in
+ * apps/mcp-server/test/tool-budget.test.ts, which counts the SDK's real
+ * JSON.stringify(inputSchema). Tools registered via the SDK's schema-first
+ * overload (no description string) count name-only for the prose figure — a
  * known undercount, acceptable for trend telemetry.
  */
 export interface ToolRegistrationStats {
   profile: McpToolProfile;
   tool_count: number;
   name_description_tokens: number;
+  schema_tokens: number;
 }

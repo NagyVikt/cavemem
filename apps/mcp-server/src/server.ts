@@ -52,6 +52,24 @@ export type { BridgeStatus, BridgeStatusOptions } from './tools/bridge.js';
 export { LEAN_TOOLS, resolveToolProfile } from './tools/tool-profile.js';
 
 /**
+ * Token proxy for a tool's input schema: param keys plus their public
+ * `.describe()` strings — the agent-facing bulk of the rendered JSON schema.
+ * Deliberately NOT a full zod→JSON-schema conversion (version-coupled; the
+ * byte-exact schema-inclusive budget lives in tool-budget.test.ts). Telemetry
+ * must never break registration, so a non-shape arg simply counts 0.
+ */
+function countSchemaTokens(schema: unknown): number {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return 0;
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(schema as Record<string, unknown>)) {
+    parts.push(key);
+    const desc = (value as { description?: unknown } | null)?.description;
+    if (typeof desc === 'string') parts.push(desc);
+  }
+  return parts.length === 0 ? 0 : countTokens(parts.join(' '));
+}
+
+/**
  * MCP stdio server exposing progressive-disclosure tools:
  * - search: compact hits with BM25 + optional semantic re-rank
  * - timeline: chronological IDs around a point
@@ -81,10 +99,12 @@ export function buildServer(
     profile: toolProfile,
     tool_count: 0,
     name_description_tokens: 0,
+    schema_tokens: 0,
   };
-  const recordRegistration = (name: string, description: string): void => {
+  const recordRegistration = (name: string, description: string, schema?: unknown): void => {
     registrationStats.tool_count += 1;
     registrationStats.name_description_tokens += countTokens(`${name} ${description}`);
+    registrationStats.schema_tokens += countSchemaTokens(schema);
   };
   const registrar = gateToolRegistration(
     server,

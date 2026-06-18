@@ -135,7 +135,10 @@ export function register(server: McpServer, ctx: ToolContext): void {
               profile: ctx.registrationStats.profile,
               tool_count: ctx.registrationStats.tool_count,
               name_description_tokens: ctx.registrationStats.name_description_tokens,
-              note: 'Per-session schema-injection cost basis: name+description tokens only. Schema-inclusive budgets are enforced by apps/mcp-server/test/tool-budget.test.ts (lean <=4200, full <=15000).',
+              schema_tokens: ctx.registrationStats.schema_tokens,
+              total_tokens:
+                ctx.registrationStats.name_description_tokens + ctx.registrationStats.schema_tokens,
+              note: 'Per-session schema-injection cost: name+description tokens plus a schema_tokens proxy (param keys + describe strings). The byte-exact schema-inclusive budget (SDK JSON.stringify(inputSchema)) is enforced by apps/mcp-server/test/tool-budget.test.ts (lean <=4200, full <=15000).',
             }
           : null;
         if (honest === true) {
