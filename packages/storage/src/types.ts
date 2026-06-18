@@ -136,6 +136,10 @@ export interface TaskClaimRow {
   state: TaskClaimState;
   expires_at: number | null;
   handoff_observation_id: number | null;
+  /** Stated outcome the lane is held for (gx /goal style). Null when unstated. */
+  goal: string | null;
+  /** Runnable criterion that proves the goal. Null when unstated. */
+  goal_check: string | null;
 }
 
 export type AccountClaimState = 'active' | 'released';

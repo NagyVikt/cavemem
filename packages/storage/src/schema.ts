@@ -549,6 +549,19 @@ export const COLUMN_MIGRATIONS: ReadonlyArray<{ table: string; column: string; s
     column: 'weight',
     sql: 'ALTER TABLE observations ADD COLUMN weight REAL NOT NULL DEFAULT 1.0',
   },
+  // Goal-on-lane — the "why" behind a file claim. Both nullable; a claim
+  // without a stated goal stays valid. Column is `goal_check`, not `check`,
+  // because CHECK is a SQLite reserved word.
+  {
+    table: 'task_claims',
+    column: 'goal',
+    sql: 'ALTER TABLE task_claims ADD COLUMN goal TEXT',
+  },
+  {
+    table: 'task_claims',
+    column: 'goal_check',
+    sql: 'ALTER TABLE task_claims ADD COLUMN goal_check TEXT',
+  },
 ];
 
 export const POST_MIGRATION_SQL = `

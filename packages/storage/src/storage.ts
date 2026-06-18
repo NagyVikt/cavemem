@@ -2243,19 +2243,37 @@ export class Storage {
     return row?.id;
   }
 
-  claimFile(c: { task_id: number; file_path: string; session_id: string }): void {
+  claimFile(c: {
+    task_id: number;
+    file_path: string;
+    session_id: string;
+    goal?: string;
+    check?: string;
+  }): void {
     const filePath = this.normalizeTaskFilePath(c.task_id, c.file_path);
     if (filePath === null) return;
-    // REPLACE semantics: the latest claimer wins. Handoffs atomically swap
-    // ownership, so the invariant "at most one owner per (task, file)" is
-    // preserved by the transaction, not by the primary key alone.
+    // Upsert, not REPLACE: the latest claimer still wins on ownership and
+    // freshness (and the state/expiry/handoff reset that a fresh claim
+    // implies), but a stated goal is preserved across a goal-less re-claim
+    // via COALESCE. The hook auto-claim path re-claims edited files with no
+    // goal; without COALESCE it would erase the goal the agent set. The
+    // "at most one owner per (task, file)" invariant is held by the primary
+    // key plus the surrounding handoff transaction.
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO task_claims(
-          task_id, file_path, session_id, claimed_at, state, expires_at, handoff_observation_id
-        ) VALUES (?, ?, ?, ?, 'active', NULL, NULL)`,
+        `INSERT INTO task_claims(
+          task_id, file_path, session_id, claimed_at, state, expires_at, handoff_observation_id, goal, goal_check
+        ) VALUES (?, ?, ?, ?, 'active', NULL, NULL, ?, ?)
+        ON CONFLICT(task_id, file_path) DO UPDATE SET
+          session_id = excluded.session_id,
+          claimed_at = excluded.claimed_at,
+          state = 'active',
+          expires_at = NULL,
+          handoff_observation_id = NULL,
+          goal = COALESCE(excluded.goal, task_claims.goal),
+          goal_check = COALESCE(excluded.goal_check, task_claims.goal_check)`,
       )
-      .run(c.task_id, filePath, c.session_id, Date.now());
+      .run(c.task_id, filePath, c.session_id, Date.now(), c.goal ?? null, c.check ?? null);
   }
 
   markClaimHandoffPending(c: {
@@ -2405,6 +2423,8 @@ export class Storage {
             : 'active',
       expires_at: row.expires_at ?? null,
       handoff_observation_id: row.handoff_observation_id ?? null,
+      goal: row.goal ?? null,
+      goal_check: row.goal_check ?? null,
     };
   }
 
